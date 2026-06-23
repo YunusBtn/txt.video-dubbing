@@ -314,15 +314,20 @@
     const getActiveVideo = opts.getActiveVideo;
     const captionSource = opts.captionSource;
 
-    let queue = [];        // henüz çalınmamış işler (sıralı)
-    let playing = null;    // şu an çalan iş
+    // İki slotlu model: current (çalan / çalmaya hazır) + next (lookahead).
+    let current = null;
+    let next = null;
+    let isPlaying = false;
     let active = false;
     let seq = 0;
     let disposer = null;
     let videoListeners = [];
     const enqueuedKeys = []; // tekrar yakalamayı engellemek için son anahtarlar
 
-    const LAG_DROP_SECONDS = 8; // sadece >8sn gerçek lag'de güncel cue'ya atla
+    const LAG_DROP_SECONDS = 8;    // sadece >8sn gerçek lag'de güncel cue'ya nazikçe atla
+    const NEXT_STALE_SECONDS = 1;  // next SADECE >1sn geride kaldıysa değiştirilir
+    const DEBUG = true;
+    const LOG_PREFIX = /udemy/i.test(location.hostname) ? '[UD-DUB]' : '[YT-DUB]';
 
     function cueKey(cue) {
       const t = cue.startTime != null ? Math.round(cue.startTime * 10) / 10 : 'x';
@@ -331,7 +336,10 @@
 
     function alreadySeen(cue) {
       const k = cueKey(cue);
-      return enqueuedKeys.indexOf(k) !== -1;
+      if (enqueuedKeys.indexOf(k) !== -1) return true;
+      if (current && cueKey(current.cue) === k) return true;
+      if (next && cueKey(next.cue) === k) return true;
+      return false;
     }
 
     function rememberCue(cue) {
@@ -362,7 +370,7 @@
         if (job.abortRequested) return;
         if (chrome.runtime.lastError || !res) {
           job.state = 'error';
-          pump();
+          tryPlay();
           return;
         }
         if (!res.ok) {
@@ -372,7 +380,7 @@
           } else if (res.error === 'no-deepl-key') {
             overlayStatus('DeepL API anahtarı eksik');
           }
-          pump();
+          tryPlay();
           return;
         }
         job.translatedText = res.translatedText;
@@ -389,76 +397,139 @@
           }
         }
         job.state = 'ready';
-        pump();
+        logSlots('prep ready');
+        tryPlay();
       };
 
       try {
         chrome.runtime.sendMessage({ type: 'prepareDub', id: job.id, text: job.cue.text }, onResult);
       } catch (e) {
         job.state = 'error';
-        pump();
+        tryPlay();
       }
     }
 
-    function liveCount() {
-      return (playing ? 1 : 0) + queue.length;
+    // ----- zaman/lag yardımcıları -----
+    function refTime(job) {
+      if (!job) return null;
+      const c = job.cue;
+      return c.endTime != null ? c.endTime : c.startTime;
     }
 
+    // Pozitif => slot videodan geride kaldı (saniye, video-zamanı)
+    function lagOf(job) {
+      const video = getActiveVideo();
+      const r = refTime(job);
+      if (!video || r == null) return 0;
+      return video.currentTime - r;
+    }
+
+    // ----- slot durum logu -----
+    function slotStr(job) {
+      if (!job) return '∅';
+      const c = job.cue;
+      const win = (c.startTime != null ? c.startTime.toFixed(1) : '?') + '→' +
+                  (c.endTime != null ? c.endTime.toFixed(1) : '?');
+      return job.state + ' ' + win + ' "' + (c.text || '').slice(0, 24) + '"';
+    }
+    function logSlots(event) {
+      if (!DEBUG) return;
+      const v = getActiveVideo();
+      const t = v ? v.currentTime.toFixed(1) : '?';
+      const r = v ? (v.playbackRate || 1) : 1;
+      console.debug(LOG_PREFIX + ' t=' + t + 's x' + r + ' | ' + event +
+        '\n          current=[' + slotStr(current) + ']' +
+        '\n          next   =[' + slotStr(next) + ']');
+    }
+
+    // ----- yakalama (iki slotlu, kayıpsız next) -----
     function enqueueCue(cue) {
       if (!active || !cue || !cue.text || !cue.text.trim()) return;
       if (alreadySeen(cue)) return;
-      // Slot derinliği max 2 (current + next)
-      if (liveCount() >= 2) return;
-      rememberCue(cue);
-      const job = makeJob(cue);
-      queue.push(job);
-      prep(job); // decoupled: hemen arka planda hazırla
-      pump();
-    }
 
-    // Lookahead: çalmaya başlayan cue'dan sonrakini önceden hazırla
-    function prefetchAfter(cue) {
-      if (!captionSource.getNextCue) return;
-      if (liveCount() >= 2) return;
-      let next = null;
-      try { next = captionSource.getNextCue(cue); } catch (e) { next = null; }
-      if (next && next.text && next.text.trim() && !alreadySeen(next)) {
-        rememberCue(next);
-        const job = makeJob(next);
-        queue.push(job);
-        prep(job);
-      }
-    }
-
-    function pump() {
-      if (!active || playing) return;
-
-      while (queue.length) {
-        const job = queue[0];
-        if (job.state === 'error') { queue.shift(); continue; }
-
-        const video = getActiveVideo();
-        // Sadece gerçek büyük lag durumunda öndeki cue'yu düşür
-        if (video && job.cue.endTime != null &&
-            job.cue.endTime < video.currentTime - LAG_DROP_SECONDS) {
-          queue.shift();
-          continue;
-        }
-
-        if (job.state !== 'ready') return; // hazır değil; hazır olunca pump tekrar çağrılır
-
-        playing = queue.shift();
-        prefetchAfter(playing.cue); // bir sonrakini önden hazırla
-        playCurrent(playing);
+      // 1) current boşsa -> doldur, hazırlamaya başla, oynatmayı dene
+      if (!current) {
+        current = makeJob(cue);
+        rememberCue(cue);
+        prep(current);
+        logSlots('yakala -> current');
+        tryPlay();
         return;
       }
 
-      // Çalınacak bir şey yok -> ducking'i geri al
-      unduck(getActiveVideo());
-      overlayHide();
+      // 2) next boşsa -> doldur (decoupled pre-fetch)
+      if (!next) {
+        next = makeJob(cue);
+        rememberCue(cue);
+        prep(next);
+        logSlots('yakala -> next');
+        return;
+      }
+
+      // 3) Her iki slot da dolu -> bu, 3. segment.
+      //    KURAL: next SADECE gerçekten geride kaldıysa (>1sn lag) değiştirilir.
+      //    Aksi halde 3. segment ATILIR, next korunur ve sırayla oynatılır.
+      const nextLag = lagOf(next);
+      if (nextLag > NEXT_STALE_SECONDS) {
+        logSlots('next BAYAT (lag=' + nextLag.toFixed(2) + 's) -> degistiriliyor');
+        abortJob(next);
+        next = makeJob(cue);
+        rememberCue(cue);
+        prep(next);
+      } else {
+        logSlots('3. segment ATILDI (next lag=' + nextLag.toFixed(2) + 's, korunuyor) "' +
+          cue.text.slice(0, 24) + '"');
+      }
+    }
+
+    // Lookahead: next boşken bir sonraki cue'yu önceden hazırla (asla ezme)
+    function fillNextLookahead() {
+      if (next || !current || !captionSource.getNextCue) return;
+      let nc = null;
+      try { nc = captionSource.getNextCue(current.cue); } catch (e) { nc = null; }
+      if (nc && nc.text && nc.text.trim() && !alreadySeen(nc)) {
+        next = makeJob(nc);
+        rememberCue(nc);
+        prep(next);
+        logSlots('lookahead -> next');
+      }
+    }
+
+    function promoteNext() {
+      current = next;
+      next = null;
+      if (!current) {
+        unduck(getActiveVideo());
+        overlayHide();
+      }
+    }
+
+    function tryPlay() {
+      if (!active || isPlaying || !current) return;
+
+      // Aşırı lag (>8sn): current çok eskidiyse nazikçe atla, next'e geç
+      if (lagOf(current) > LAG_DROP_SECONDS) {
+        logSlots('current >8s LAG -> atlanip next promote ediliyor');
+        abortJob(current);
+        promoteNext();
+        tryPlay();
+        return;
+      }
+
+      if (current.state === 'error') {
+        logSlots('current HATA -> atlaniyor');
+        abortJob(current);
+        promoteNext();
+        tryPlay();
+        return;
+      }
+
+      if (current.state !== 'ready') return; // hazır değil; prep bitince tryPlay tekrar çağrılır
+      playCurrent(current);
     }
 
     function playCurrent(job) {
+      isPlaying = true;
       const video = getActiveVideo();
       const videoRate = video ? (video.playbackRate || 1) : 1;
       const cueWindow = (job.cue.endTime != null && job.cue.startTime != null)
@@ -467,6 +538,10 @@
 
       overlayText(job.translatedText, job.cue.text);
       duck(video);
+      logSlots('OYNAT current');
+
+      // current çalarken next için lookahead doldur (boşsa)
+      fillNextLookahead();
 
       const useOpenAI = job.audioData && !job.fallbackBrowser;
       const player = useOpenAI
@@ -474,8 +549,12 @@
         : playBrowser(job, cueWindow, videoRate);
 
       player.then(() => {
-        if (playing === job) playing = null;
-        pump();
+        isPlaying = false;
+        if (current === job) {
+          logSlots('BITTI current -> next promote');
+          promoteNext();
+        }
+        tryPlay();
       });
     }
 
@@ -489,25 +568,26 @@
     }
 
     function abortAll() {
-      if (playing) { abortJob(playing); playing = null; }
-      queue.forEach(abortJob);
-      queue = [];
+      if (current) { abortJob(current); current = null; }
+      if (next) { abortJob(next); next = null; }
+      isPlaying = false;
       enqueuedKeys.length = 0;
       try { chrome.runtime.sendMessage({ type: 'clearCache' }); } catch (e) {}
       try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
       unduck(getActiveVideo());
       overlayHide();
+      logSlots('abortAll (seek/ended) — slotlar temizlendi');
     }
 
     function pauseAll() {
-      if (playing && playing.controls && playing.controls.pause) {
-        try { playing.controls.pause(); } catch (e) {}
+      if (current && current.controls && current.controls.pause) {
+        try { current.controls.pause(); } catch (e) {}
       }
     }
 
     function resumeAll() {
-      if (playing && playing.controls && playing.controls.resume) {
-        try { playing.controls.resume(); } catch (e) {}
+      if (current && current.controls && current.controls.resume) {
+        try { current.controls.resume(); } catch (e) {}
       }
     }
 
