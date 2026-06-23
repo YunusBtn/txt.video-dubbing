@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TR Dublaj — Ayarlar</title>
+  <style>
+    body {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 24px;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: #16171b;
+      color: #e8eaed;
+      line-height: 1.5;
+    }
+    h1 { font-size: 20px; }
+    fieldset {
+      border: 1px solid #34363d;
+      border-radius: 8px;
+      margin-bottom: 18px;
+      padding: 14px 16px;
+    }
+    legend { padding: 0 6px; font-weight: 600; color: #9cd0ff; }
+    label { display: block; margin: 10px 0 4px; font-size: 14px; }
+    .hint { font-size: 12px; color: #9aa0aa; margin-top: 2px; }
+    input[type="text"], input[type="password"], select, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 7px 9px;
+      background: #232530;
+      border: 1px solid #3a3d47;
+      border-radius: 6px;
+      color: #e8eaed;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    textarea { resize: vertical; min-height: 64px; }
+    .inline { display: flex; align-items: center; gap: 8px; }
+    .inline input[type="checkbox"] { width: 16px; height: 16px; }
+    .inline label { margin: 0; }
+    .rangeval { font-variant-numeric: tabular-nums; color: #9cd0ff; }
+    .save-bar {
+      position: sticky;
+      bottom: 0;
+      background: #16171b;
+      padding: 12px 0;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    button {
+      padding: 9px 18px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #4f9d69;
+      color: #fff;
+    }
+    #saved { color: #6ee787; font-size: 13px; display: none; }
+  </style>
+</head>
+<body>
+  <h1>TR Dublaj — Ayarlar</h1>
+
+  <fieldset>
+    <legend>Çeviri (DeepL)</legend>
+    <label for="deeplKey">DeepL API Anahtarı</label>
+    <input type="password" id="deeplKey" placeholder="xxxxxxxx-xxxx-...:fx" />
+    <div class="hint">Ücretsiz anahtarlar <code>:fx</code> ile biter, otomatik algılanır.</div>
+
+    <label for="sourceLang">Kaynak Dil</label>
+    <select id="sourceLang">
+      <option value="">Otomatik (DeepL tespit etsin)</option>
+      <option value="EN">İngilizce</option>
+      <option value="DE">Almanca</option>
+      <option value="FR">Fransızca</option>
+      <option value="ES">İspanyolca</option>
+      <option value="IT">İtalyanca</option>
+      <option value="RU">Rusça</option>
+      <option value="JA">Japonca</option>
+      <option value="ZH">Çince</option>
+      <option value="PT">Portekizce</option>
+      <option value="NL">Felemenkçe</option>
+      <option value="PL">Lehçe</option>
+      <option value="AR">Arapça</option>
+    </select>
+    <div class="hint">Hedef dil her zaman Türkçe (TR).</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Seslendirme (TTS)</legend>
+    <label for="engine">Dublaj Motoru</label>
+    <select id="engine">
+      <option value="browser">Browser TTS (ücretsiz, gecikmesiz)</option>
+      <option value="openai">OpenAI TTS (daha doğal, gecikme pre-fetch ile gizlenir)</option>
+    </select>
+
+    <label for="browserVoice">Browser Sesi</label>
+    <select id="browserVoice"><option value="">Otomatik (sistem Türkçe sesi)</option></select>
+    <div class="hint">Microsoft Emel / Tolga gibi Türkçe sesler önerilir.</div>
+
+    <label for="openaiKey">OpenAI API Anahtarı (opsiyonel)</label>
+    <input type="password" id="openaiKey" placeholder="sk-..." />
+    <div class="hint">Boşsa OpenAI seçili olsa bile otomatik Browser TTS'e düşülür.</div>
+
+    <label for="openaiVoice">OpenAI Sesi</label>
+    <select id="openaiVoice">
+      <option value="nova">nova</option>
+      <option value="onyx">onyx</option>
+      <option value="shimmer">shimmer</option>
+      <option value="coral">coral</option>
+      <option value="fable">fable</option>
+    </select>
+
+    <label for="openaiInstructions">OpenAI TTS Talimatı</label>
+    <textarea id="openaiInstructions" placeholder="Akıcı ve doğal Türkçe konuş, teknik terimleri orijinal dilde söyle."></textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>Terimler</legend>
+    <label for="protectedTermsText">Teknik Terim Koruma Listesi</label>
+    <textarea id="protectedTermsText" placeholder="backend&#10;REST API&#10;Spring Boot"></textarea>
+    <div class="hint">Her satıra bir terim. Bu terimler çevrilmeden korunur (placeholder yöntemi).</div>
+
+    <label for="pronunciationText">Telaffuz Sözlüğü</label>
+    <textarea id="pronunciationText" placeholder="backend=bekent&#10;REST API=rest ey pi ay"></textarea>
+    <div class="hint"><code>terim=okunuş</code> formatı. Overlay'deki yazı değişmez, sadece TTS'e giden metin değişir.</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Senkron & Ses</legend>
+    <label for="maxTtsRate">Maksimum Dublaj Hız Katsayısı: <span class="rangeval" id="maxTtsRateVal">2.5</span>x</label>
+    <input type="range" id="maxTtsRate" min="1.0" max="3.0" step="0.1" value="2.5" style="width:100%" />
+
+    <label for="duckingVolume">Orijinal Video Sesi (dublaj sırasında): <span class="rangeval" id="duckingVolumeVal">0.15</span></label>
+    <input type="range" id="duckingVolume" min="0" max="1" step="0.05" value="0.15" style="width:100%" />
+
+    <div class="inline" style="margin-top:14px">
+      <input type="checkbox" id="syncEnabled" />
+      <label for="syncEnabled">Sync dublajı aç</label>
+    </div>
+    <div class="inline" style="margin-top:10px">
+      <input type="checkbox" id="showOriginal" />
+      <label for="showOriginal">Overlay'de orijinal metni göster</label>
+    </div>
+    <div class="inline" style="margin-top:10px">
+      <input type="checkbox" id="compact" />
+      <label for="compact">Kompakt overlay modu</label>
+    </div>
+  </fieldset>
+
+  <div class="save-bar">
+    <button id="save">Kaydet</button>
+    <span id="saved">✓ Kaydedildi</span>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

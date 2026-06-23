@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TR Dublaj</title>
+  <style>
+    body {
+      width: 280px;
+      margin: 0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: #1e1f24;
+      color: #e8eaed;
+    }
+    header {
+      padding: 12px 14px;
+      background: #2a2c33;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .body { padding: 14px; }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .status {
+      font-size: 13px;
+      color: #b6bcc6;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+    .status b { color: #e8eaed; }
+    button {
+      width: 100%;
+      padding: 9px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .toggle-on { background: #d9534f; color: #fff; }
+    .toggle-off { background: #4f9d69; color: #fff; }
+    .link {
+      margin-top: 12px;
+      text-align: center;
+    }
+    .link a { color: #6ea8fe; font-size: 13px; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header>TR Dublaj — YouTube &amp; Udemy</header>
+  <div class="body">
+    <div class="status" id="status">Durum yükleniyor…</div>
+    <button id="toggle" class="toggle-off">Yükleniyor…</button>
+    <div class="link"><a href="#" id="openOptions">⚙ Ayarları aç</a></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "TR Dublaj — YouTube & Udemy",
+  "version": "1.0.0",
+  "description": "YouTube ve Udemy videolarının altyazılarını gerçek zamanlı yakalar, DeepL ile Türkçeye çevirir ve senkron Türkçe dublaj yapar.",
+  "permissions": ["storage", "activeTab", "tabs", "scripting"],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.udemy.com/*",
+    "https://api-free.deepl.com/*",
+    "https://api.deepl.com/*",
+    "https://api.openai.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "TR Dublaj"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["content-shared.js", "content-youtube.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://*.udemy.com/*"],
+      "js": ["content-shared.js", "content-udemy.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}

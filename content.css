@@ -1,0 +1,61 @@
+/* TR Dublaj overlay stilleri */
+
+.trdub-overlay {
+  position: fixed;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  z-index: 2147483600;
+  max-width: 70vw;
+  pointer-events: none;
+  text-align: center;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.trdub-overlay.trdub-visible {
+  opacity: 1;
+}
+
+.trdub-overlay .trdub-status {
+  display: none;
+  margin: 0 auto 6px;
+  padding: 3px 10px;
+  background: rgba(180, 60, 30, 0.92);
+  color: #fff;
+  font-size: 12px;
+  border-radius: 6px;
+  width: fit-content;
+}
+
+.trdub-overlay .trdub-main {
+  display: inline-block;
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1.35;
+  border-radius: 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.trdub-overlay .trdub-orig {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 3px 10px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #cfd4dc;
+  font-size: 14px;
+  line-height: 1.3;
+  border-radius: 6px;
+}
+
+/* Kompakt mod */
+.trdub-overlay.trdub-compact .trdub-main {
+  font-size: 16px;
+  padding: 4px 10px;
+}
+.trdub-overlay.trdub-compact .trdub-orig {
+  font-size: 12px;
+}
