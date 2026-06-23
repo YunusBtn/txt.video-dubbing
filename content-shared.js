@@ -62,18 +62,27 @@
   }
   TRDUB.clamp = clamp;
 
-  // idealRate = audioDuration / (cueWindow / videoRate)
-  // Video hızlandıkça gerçek pencere kısalır -> TTS hızlanır.
+  // Taban dublaj hızı: hiçbir cümle bunun altında okunmaz (1.0x fazla yavaş
+  // hissettiriyordu). Pencereye rahat sığan cümleler bile en az 1.15x okunur,
+  // gerektiğinde maxTtsRate'e kadar hızlanır.
+  const BASE_RATE = 1.15;
+  TRDUB.BASE_RATE = BASE_RATE;
+
+  // idealRate = max(BASE_RATE, audioDuration / (cueWindow / videoRate))
+  // Video hızlandıkça gerçek pencere kısalır -> TTS daha da hızlanır.
   function computeIdealRate(audioDuration, cueWindowSeconds, videoRate, maxRate) {
     const vr = videoRate || 1;
     const mr = maxRate || 2.5;
+    // Taban en az BASE_RATE * videoRate olsun (2x videoda taban da kayar)
+    const floor = BASE_RATE * vr;
     if (!cueWindowSeconds || cueWindowSeconds <= 0) {
-      // DOM modunda gerçek pencere yok -> en azından video hızına ayak uydur
-      return clamp(vr, 1.0, mr);
+      // DOM modunda gerçek pencere yok -> taban hızla oku
+      return clamp(floor, BASE_RATE, mr);
     }
     const effectiveWindow = cueWindowSeconds / vr;
-    if (effectiveWindow <= 0 || !audioDuration) return clamp(vr, 1.0, mr);
-    return clamp(audioDuration / effectiveWindow, 1.0, mr);
+    if (effectiveWindow <= 0 || !audioDuration) return clamp(floor, BASE_RATE, mr);
+    const ideal = Math.max(floor, audioDuration / effectiveWindow);
+    return clamp(ideal, BASE_RATE, mr);
   }
   TRDUB.computeIdealRate = computeIdealRate;
 
