@@ -63,9 +63,9 @@
   TRDUB.clamp = clamp;
 
   // Taban dublaj hızı: hiçbir cümle bunun altında okunmaz (1.0x fazla yavaş
-  // hissettiriyordu). Pencereye rahat sığan cümleler bile en az 1.15x okunur,
-  // gerektiğinde maxTtsRate'e kadar hızlanır.
-  const BASE_RATE = 1.15;
+  // hissettiriyordu). Pencereye rahat sığan cümleler bile en az 1.38x okunur,
+  // gerektiğinde maxTtsRate'e kadar hızlanır. (1.15 * 1.2 ≈ 1.38)
+  const BASE_RATE = 1.38;
   TRDUB.BASE_RATE = BASE_RATE;
 
   // idealRate = max(BASE_RATE, audioDuration / (cueWindow / videoRate))
